@@ -1,2 +1,2 @@
 # bod2lua
-For the game Primordialis
+Converts .bod files to code which can be run with Primordialis' lua api to creat that .bod
