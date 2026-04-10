@@ -38,13 +38,15 @@ struct Cell
 };
 
 std::unordered_map<uint32_t, float3> cellxcolour = {
+    { 0x454E4F4E, float3(1.000, 1.000, 1.000) }, // NONE
     { 0x59444F42, float3(0.300, 0.300, 0.300) }, // BODY
     { 0x4D495753, float3(0.500, 0.700, 0.400) }, // SWIM
     { 0x4B454553, float3(0.800, 0.200, 0.900) }, // SEEK
-    { 0x44524148, float3(0.900, 0.900, 0.900) }, // HARD
+    { 0x44524148, float3(1.000, 1.000, 0.900) }, // HARD
     { 0x50494C53, float3(0.300, 0.400, 0.800) }, // SLIP
     { 0x5447494C, float3(0.900, 0.850, 0.600) }, // LIGT
     { 0x5353414D, float3(0.050, 0.050, 0.050) }, // MASS
+    { 0x454E4F42, float3(0.500, 0.500, 0.500) }, // BONE
     { 0x58454C46, float3(0.800, 0.300, 0.400) }, // FLEX
     { 0x54534C45, float3(0.836, 0.525, 0.255) }, // ELST
     { 0x4E494556, float3(0.162, 0.000, 0.055) }, // VEIN
@@ -53,7 +55,7 @@ std::unordered_map<uint32_t, float3> cellxcolour = {
     { 0x4C53554D, float3(0.900, 0.400, 0.400) }, // MUSL
     { 0x4C464E49, float3(0.730, 0.760, 0.170) }, // INFL
     { 0x54524148, float3(0.900, 0.100, 0.100) }, // HART
-    { 0x574F4C47, float3(0.900, 0.900, 0.900) }, // GLOW
+    { 0x574F4C47, float3(1.000, 1.000, 0.900) }, // GLOW
     { 0x45524957, float3(0.700, 0.700, 0.800) }, // WIRE
     { 0x43504143, float3(0.330, 0.125, 0.003) }, // CAPC
     { 0x43444E49, float3(0.003, 0.125, 0.330) }, // INDC
@@ -78,6 +80,8 @@ std::unordered_map<uint32_t, float3> cellxcolour = {
     { 0x4B4E494C, float3(0.196, 0.029, 1.000) }, // LINK
     { 0x464C4553, float3(0.218, 0.487, 0.133) }, // SELF
     { 0x45544147, float3(0.800, 0.500, 0.500) }, // GATE
+    { 0x4B455242, float3(0.800, 0.600, 0.500) }, // BREK
+    { 0x4D455453, float3(0.450, 0.040, 0.090) }, // STEM
     { 0x54454448, float3(0.900, 0.200, 0.200) }, // HDET
     { 0x44455053, float3(0.700, 0.900, 0.200) }, // SPED
     { 0x4D524854, float3(0.300, 0.060, 0.050) }, // THRM
@@ -103,6 +107,7 @@ std::unordered_map<uint32_t, float3> cellxcolour = {
     { 0x4C4C4157, float3(0.006, 0.016, 0.050) }, // WALL
     { 0x4147454E, float3(0.900, 0.050, 0.050) }, // NEGA
     { 0x4F54504F, float3(0.104, 0.646, 0.379) }, // OPTO
+    { 0x534E5254, float3(0.083, 0.101, 0.469) }, // TRNS
     { 0x544F4F52, float3(0.211, 0.084, 0.029) }, // ROOT
     { 0x54524F50, float3(0.513, 0.424, 0.405) }, // PORT
     { 0x42415243, float3(0.000, 0.000, 0.000) }, // CRAB
@@ -177,8 +182,6 @@ std::string extractBodCells(std::vector<Cell>& cells, uint64_t*& combo_cell_list
     int* normal_cell_list = new int[n_normal];
     combo_cell_list = new uint64_t[n_combos];
     float* color_list = new float[n_colors * 4]; // 4 floats (RGBA)
-
-    std::cout << "normal cells: " << n_normal << "\ncombo cells: " << n_combos << "\ncolours: " << n_colors << "\n";
 
     readDecompressedArray(decompresseddat, compressedreadoffset, normal_cell_list, n_normal * sizeof(int));
     readDecompressedArray(decompresseddat, compressedreadoffset, combo_cell_list, n_combos * sizeof(uint64_t));
@@ -309,7 +312,7 @@ void passComboCell(std::ofstream& generated, uint64_t* combos, uint32_t comboidx
     float3 average = { (coloura.r + colourb.r) / 2.f, (coloura.g + colourb.g) / 2.f, (coloura.b + colourb.b) / 2.f };
     colours.emplace(comboname, average);
 
-    generated << comboarray_name << "_" << std::to_string(comboname) << " = get_combo_id( " << line << " )\n";
+    generated << "local " << comboarray_name << "_" << std::to_string(comboname) << " = get_combo_id( " << line << " )\n";
 }
 
 std::string passComboCells(std::ofstream& generated, uint64_t* combos, uint32_t n_combos, std::unordered_map<uint32_t, float3>& colours)
@@ -388,10 +391,8 @@ std::string outputLua(std::vector<Cell>& cells, uint64_t* combos, uint32_t n_com
     return "ok";
 }
 
-int main()
+void bod2lua()
 {
-    std::cout << "Gunno's Bod2Lua \nusing .bod format 5 and LZ4 compression version " << LZ4_versionString() << "\n";
-
     std::vector<Cell> cells;
 
     uint64_t* combos = nullptr;
@@ -404,22 +405,29 @@ int main()
     {
         std::cout << "Cannot continue\n";
         std::system("pause");
-        return -1;
+        return;
     }
 
     err = outputLua(cells, combos, numcombos);
     std::cout << "Created lua: " << err << "\n";
 
     delete[] combos;
-    
+
     if (err != "ok")
     {
         std::cout << "Cannot continue\n";
         std::system("pause");
-        return -1;
+        return;
     }
 
     std::cout << "\n\nDone!\n";
+}
+
+int main()
+{
+    std::cout << "Gunno's Bod2Lua \nusing .bod format 5 and LZ4 compression version " << LZ4_versionString() << "\n";
+
+    bod2lua();
 
     std::system("pause");
 }
